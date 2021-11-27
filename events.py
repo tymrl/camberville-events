@@ -215,6 +215,29 @@ def get_lilypad_events():
 
     return events
 
+def get_aeronaut_events():
+    print('Getting events at Aeronaut...')
+    aeronaut_events_script = BeautifulSoup(
+        requests.get('https://www.aeronautbrewing.com/events/').text,
+        features='html.parser'
+    ).find_all('script')[7]
+
+    aeronaut_events = json.loads(aeronaut_events_script.string.split('var EVENTS = ')[1].split(';var EVENTS_CURRENT=true')[0])
+
+    events = []
+    for event in aeronaut_events:
+        if event['category'] != 'music':
+            continue
+        events.append({
+            'name': event['name'],
+            'location': 'Aeronaut ' + ('Brewery' if event['venue_slug'] == 'somerville' else 'Cannery'),
+            'datetime': arrow.get(
+                event['date'] + ' ' + event['start'],
+                'YYYY-MM-DD H:mm', tzinfo='US/Eastern')
+        })
+
+    return events
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--days', type=int, default=3,
                     help='Number of days to show events for, including today')
@@ -229,7 +252,8 @@ events = (
     get_brattle_events(args.days) +
     get_plough_events() +
     get_crystal_ballroom_events() +
-    get_lilypad_events()
+    get_lilypad_events() +
+    get_aeronaut_events()
 )
 print()
 
