@@ -101,8 +101,11 @@ def get_burren_events():
             if ':' not in timestring:
                 timestring += ':00'
             timestring += ' PM'
-
-            datetime = arrow.get(datestring + timestring, 'dddd MMMM D, YYYYh:mm A', tzinfo='US/Eastern')
+            try:
+                datetime = arrow.get(datestring + timestring, 'dddd MMMM D, YYYYh:mm A', tzinfo='US/Eastern')
+            except arrow.parser.ParserMatchError as e:
+                print(e)
+                continue
 
             events.append({
                 'location': 'The Burren',
