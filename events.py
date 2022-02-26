@@ -311,7 +311,7 @@ print()
 
 evening = ''
 for event in sorted(events, key=lambda event: event['datetime']):
-    if event['datetime'] < now.shift(hours=-4) or event['datetime'] > now.shift(days=args.days):
+    if event['datetime'] < now.floor('day') or event['datetime'] > now.shift(days=args.days).ceil('day'):
         continue
     if 'Livestream' in event['name'] or 'Trivia' in event['name']:
         continue
