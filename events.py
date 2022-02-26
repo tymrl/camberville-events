@@ -290,7 +290,7 @@ def get_toad_events():
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--days', type=int, default=3,
+parser.add_argument('-d', '--days', type=int, default=1,
                     help='Number of days to show events for, including today')
 args = parser.parse_args()
 
@@ -311,7 +311,7 @@ print()
 
 evening = ''
 for event in sorted(events, key=lambda event: event['datetime']):
-    if event['datetime'] < now.shift(hours=-4) or event['datetime'] > now.shift(days=args.days):
+    if event['datetime'] < now.floor('day') or event['datetime'] > now.shift(days=args.days).floor('day'):
         continue
     if 'Livestream' in event['name'] or 'Trivia' in event['name']:
         continue
