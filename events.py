@@ -241,6 +241,54 @@ def get_aeronaut_events():
 
     return events
 
+def get_toad_events():
+    print('Getting events at Toad...')
+
+    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"}
+
+    toad_calendar = BeautifulSoup(
+        requests.get('https://toadcambridge.com/calendar/', headers=headers).text,
+        features='html.parser'
+    )
+
+    # There's currently a bug in the Toad website where the first time you hit "next" you get the same month
+    toad_calendar_next_month = BeautifulSoup(
+        requests.get(
+            BeautifulSoup(
+                requests.get(toad_calendar.find(class_='ai1ec-next-month').attrs['href'], headers=headers).text,
+                features='html.parser'
+            ).find(class_='ai1ec-next-month').attrs['href'],
+            headers=headers
+        ).text,
+        features='html.parser'
+    )
+    toad_events = toad_calendar.find_all(class_='ai1ec-day') + toad_calendar_next_month.find_all(class_='ai1ec-day')
+    events = []
+
+    for event in toad_events:
+        popover_tag = event.find(class_='ai1ec-popover')
+        if popover_tag is None:
+            continue
+
+        datetime = arrow.get(
+            now.format('YYYY') + ' ' + popover_tag.find(class_='ai1ec-event-time').text.strip(),
+            'YYYY MMM D @ h:mm a', tzinfo='US/Eastern'
+        )
+
+        if datetime.month >= now.month:
+            datetime = datetime.replace(year=now.year)
+        else:
+            datetime = datetime.replace(year=now.year + 1)
+
+        events.append({
+            'location': 'Toad',
+            'name': popover_tag.find(class_='ai1ec-load-event').text.strip(),
+            'datetime': datetime
+        })
+
+    return events
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--days', type=int, default=3,
                     help='Number of days to show events for, including today')
@@ -248,6 +296,7 @@ args = parser.parse_args()
 
 print()
 events = (
+    get_toad_events() +
     get_porch_events() + 
     get_city_winery_events() + 
     get_sinclair_events() + 
