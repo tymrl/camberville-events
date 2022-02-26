@@ -9,22 +9,33 @@ now = arrow.now()
 def get_porch_events():
     print('Getting events at The Porch...')
     porch_events = BeautifulSoup(
-        requests.get('http://theporchsouthern.com/listen-1').text,
+        requests.get('https://www.eventbrite.com/o/the-porch-southern-fare-amp-juke-joint-34116949537#events').text,
         features='html.parser'
-    ).find_all(class_='eventlist-column-info')
+    ).find_all(class_='eds-event-card-content__content-container')
 
     events = []
     for event in porch_events:
-        date = event.find(class_='event-date')['datetime']
-        time = event.find(class_='event-time-12hr-start')
-        if not time:
+        date_string = event.find(class_='eds-event-card-content__sub-title').text.strip()
+        # Unsure what to do if there are multiple dates
+        if date_string == 'MULTIPLE DATES':
             continue
-        datetime = arrow.get(date + time.text, 'YYYY-MM-DDh:mm A', tzinfo='US/Eastern')
-        events.append({
+        elif 'Today at' in date_string:
+            date_string = date_string.replace('Today at', now.format('ddd, MMM D,'))
+        
+        datetime = arrow.get(date_string, 'ddd, MMM D, h:mm A', tzinfo='US/Eastern')
+
+        if datetime.month >= now.month:
+            datetime = datetime.replace(year=now.year)
+        else:
+            datetime = datetime.replace(year=now.year + 1)
+
+        new_event = {
             'location': 'The Porch',
-            'name': event.find(class_='eventlist-title').text,
+            'name': event.find(class_='eds-is-hidden-accessible').text.strip(),
             'datetime': datetime,
-        })
+        }
+        if new_event['datetime'] not in [e['datetime'] for e in events]:
+            events.append(new_event)
 
     return events
 
