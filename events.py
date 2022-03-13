@@ -21,6 +21,8 @@ def get_porch_events():
             continue
         elif 'Today at' in date_string:
             date_string = date_string.replace('Today at', now.format('ddd, MMM D,'))
+        elif 'Tomorrow' in date_string:
+            date_string = date_string.replace('Tomorrow at', now.shift(days=1).format('ddd, MMM D,'))
         
         datetime = arrow.get(date_string, 'ddd, MMM D, h:mm A', tzinfo='US/Eastern')
 
