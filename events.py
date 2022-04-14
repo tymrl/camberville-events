@@ -127,6 +127,7 @@ def get_burren_events():
             })
 
     return events
+
 def get_brattle_events(days):
     print('Getting events at Brattle Theater...')
     url_base = 'https://brattlefilm.org/'
@@ -301,6 +302,47 @@ def get_toad_events():
 
     return events
 
+def get_atwoods_events():
+    print('Getting events at Atwoods...')
+
+    base_url = 'https://atwoodstavern.com/music'
+    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"}
+    atwoods_events = BeautifulSoup(
+        requests.get(base_url, headers=headers).text,
+        features='html.parser'
+    ).find_all(class_='summary-item')
+
+    events = []
+    for event in atwoods_events:
+        title_element = event.find(class_='summary-title')
+
+        date = event.find(class_='summary-metadata-item--date').text.strip()
+        details_string = event.find(class_="summary-excerpt").find("p").text
+        time = details_string.split('showtime')[0].split(",")[-1].replace("showtime", "").strip() + 'm'
+        
+        time_format = ''
+        if ':' in time:
+            time_format = 'h:mma'
+        else:
+            time_format = 'ha'
+        
+        if 'cancel' in time.lower():
+            continue
+
+        try:
+            datetime = arrow.get(date + time, 'MMM D, YYYY' + time_format, tzinfo='US/Eastern')
+        except arrow.parser.ParserMatchError as e:
+            print(e)
+            continue
+
+        events.append({
+            'location': 'Atwoods',
+            'name': title_element.text.strip(),
+            'datetime': datetime
+        })
+
+    return events
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--days', type=int, default=1,
@@ -318,7 +360,8 @@ events = (
     get_plough_events() +
     get_crystal_ballroom_events() +
     get_lilypad_events() +
-    get_aeronaut_events()
+    get_aeronaut_events() +
+    get_atwoods_events()
 )
 print()
 
