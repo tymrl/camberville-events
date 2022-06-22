@@ -259,15 +259,11 @@ def get_lilypad_events():
 
 def get_aeronaut_events():
     print('Getting events at Aeronaut...')
-    aeronaut_events_script = BeautifulSoup(
-        requests.get(
-            'https://www.aeronautbrewing.com/events/',
-            headers=headers
-        ).text,
-        features='html.parser'
-    ).find_all('script')[7]
-
-    aeronaut_events = json.loads(aeronaut_events_script.string.split('var EVENTS = ')[1].split(';var EVENTS_CURRENT=true')[0])
+    # Get the JSON of the events directly from the CDN
+    aeronaut_events = json.loads(requests.get(
+        'https://d3izki9aezxlkr.cloudfront.net/public_events.json',
+        headers=headers
+    ).text)
 
     events = []
     for event in aeronaut_events:
