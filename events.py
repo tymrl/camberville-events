@@ -5,11 +5,15 @@ import requests
 from bs4 import BeautifulSoup
 
 now = arrow.now()
+headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"}
 
 def get_porch_events():
     print('Getting events at The Porch...')
     porch_events = BeautifulSoup(
-        requests.get('https://www.eventbrite.com/o/the-porch-southern-fare-amp-juke-joint-34116949537#events').text,
+        requests.get(
+            'https://www.eventbrite.com/o/the-porch-southern-fare-amp-juke-joint-34116949537#events',
+            headers=headers
+        ).text,
         features='html.parser'
     ).find_all(class_='eds-event-card-content__content-container')
 
@@ -44,7 +48,10 @@ def get_porch_events():
 def get_city_winery_events():
     print('Getting events at City Winery...')
     city_winery_search_results = BeautifulSoup(
-        requests.get('https://www.citywinery.com/boston/Online/default.asp?BOparam::WScontent::loadArticle::permalink=boston-buy-tickets').text,
+        requests.get(
+            'https://www.citywinery.com/boston/Online/default.asp?BOparam::WScontent::loadArticle::permalink=boston-buy-tickets',
+            headers=headers
+        ).text,
         features='html.parser'
     ).find_all('script')[25]
 
@@ -65,7 +72,10 @@ def get_city_winery_events():
 def get_sinclair_events():
     print('Getting events at The Sinclair...')
     sinclair_events = BeautifulSoup(
-        requests.get('https://www.sinclaircambridge.com/events').text,
+        requests.get(
+            'https://www.sinclaircambridge.com/events',
+            headers=headers
+        ).text,
         features='html.parser'
     ).find_all(class_='info')
 
@@ -93,7 +103,10 @@ def get_burren_events():
     burren_evenings = [
         date_header.find_parent('table').find_parent('table') for date_header in 
             BeautifulSoup(
-                requests.get('http://www.burren.com/music.html').text,
+                requests.get(
+                    'http://www.burren.com/music.html',
+                    headers=headers
+                ).text,
                 features='html.parser'
     ).find_all(class_='HEADER')]
 
@@ -135,7 +148,10 @@ def get_brattle_events(days):
     for day_shift in range(days):
         date = now.shift(days=day_shift).format('YYYY-MM-DD')
         brattle_events = BeautifulSoup(
-            requests.get('https://brattlefilm.org/' + date).text,
+            requests.get(
+                'https://brattlefilm.org/' + date,
+                headers=headers
+            ).text,
             features='html.parser'
         ).find_all(class_='showtime')
 
@@ -156,7 +172,10 @@ def get_plough_events():
     events = []
     for month_tuple in month_tuples:
         plough_days = BeautifulSoup(
-            requests.get(url_base.format(*month_tuple)).text,
+            requests.get(
+                url_base.format(*month_tuple),
+                headers=headers
+            ).text,
             features='html.parser'
         ).find_all(class_='day-block')
 
@@ -187,7 +206,10 @@ def get_plough_events():
 def get_crystal_ballroom_events():
     print('Getting events at Crystal Ballroom...')
     crystal_events = BeautifulSoup(
-        requests.get('https://www.crystalballroomboston.com/').text,
+        requests.get(
+            'https://www.crystalballroomboston.com/',
+            headers=headers
+        ).text,
         features='html.parser'
     ).find_all(class_='event-details')
 
@@ -209,7 +231,10 @@ def get_crystal_ballroom_events():
 def get_lilypad_events():
     print('Getting events at Lily Pad...')
     lilypad_events = BeautifulSoup(
-        requests.get('https://www.lilypadinman.com/home').text,
+        requests.get(
+            'https://www.lilypadinman.com/home',
+            headers=headers
+        ).text,
         features='html.parser'
     ).find_all('article')
 
@@ -235,7 +260,10 @@ def get_lilypad_events():
 def get_aeronaut_events():
     print('Getting events at Aeronaut...')
     aeronaut_events_script = BeautifulSoup(
-        requests.get('https://www.aeronautbrewing.com/events/').text,
+        requests.get(
+            'https://www.aeronautbrewing.com/events/',
+            headers=headers
+        ).text,
         features='html.parser'
     ).find_all('script')[7]
 
@@ -258,10 +286,11 @@ def get_aeronaut_events():
 def get_toad_events():
     print('Getting events at Toad...')
 
-    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"}
-
     toad_calendar = BeautifulSoup(
-        requests.get('https://toadcambridge.com/calendar/', headers=headers).text,
+        requests.get(
+            'https://toadcambridge.com/calendar/',
+            headers=headers
+        ).text,
         features='html.parser'
     )
 
@@ -269,7 +298,10 @@ def get_toad_events():
     toad_calendar_next_month = BeautifulSoup(
         requests.get(
             BeautifulSoup(
-                requests.get(toad_calendar.find(class_='ai1ec-next-month').attrs['href'], headers=headers).text,
+                requests.get(
+                    toad_calendar.find(class_='ai1ec-next-month').attrs['href'],
+                    headers=headers
+                ).text,
                 features='html.parser'
             ).find(class_='ai1ec-next-month').attrs['href'],
             headers=headers
@@ -305,10 +337,11 @@ def get_toad_events():
 def get_atwoods_events():
     print('Getting events at Atwoods...')
 
-    base_url = 'https://atwoodstavern.com/music'
-    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"}
     atwoods_events = BeautifulSoup(
-        requests.get(base_url, headers=headers).text,
+        requests.get(
+            'https://atwoodstavern.com/music',
+            headers=headers
+        ).text,
         features='html.parser'
     ).find_all(class_='summary-item')
 
