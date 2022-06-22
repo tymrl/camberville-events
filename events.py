@@ -7,96 +7,92 @@ from bs4 import BeautifulSoup
 now = arrow.now()
 headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"}
 
-def get_porch_events():
-    print('Getting events at The Porch...')
-    porch_events = BeautifulSoup(
-        requests.get(
-            'https://www.eventbrite.com/o/the-porch-southern-fare-amp-juke-joint-34116949537#events',
-            headers=headers
-        ).text,
-        features='html.parser'
-    ).find_all(class_='eds-event-card-content__content-container')
+def get_aeronaut_events():
+    print('Getting events at Aeronaut...')
+    # Get the JSON of the events directly from the CDN
+    aeronaut_events = json.loads(requests.get(
+        'https://d3izki9aezxlkr.cloudfront.net/public_events.json',
+        headers=headers
+    ).text)
 
     events = []
-    for event in porch_events:
-        date_string = event.find(class_='eds-event-card-content__sub-title').text.strip()
-        # Unsure what to do if there are multiple dates
-        if date_string == 'MULTIPLE DATES':
+    for event in aeronaut_events:
+        if event['category'] != 'music':
             continue
-        elif 'Today at' in date_string:
-            date_string = date_string.replace('Today at', now.format('ddd, MMM D,'))
-        elif 'Tomorrow' in date_string:
-            date_string = date_string.replace('Tomorrow at', now.shift(days=1).format('ddd, MMM D,'))
-        
-        datetime = arrow.get(date_string, 'ddd, MMM D, h:mm A', tzinfo='US/Eastern')
+        events.append({
+            'name': event['name'],
+            'location': 'Aeronaut ' + ('Brewery' if event['venue_slug'] == 'somerville' else 'Cannery'),
+            'datetime': arrow.get(
+                event['date'] + ' ' + event['start'],
+                'YYYY-MM-DD H:mm', tzinfo='US/Eastern')
+        })
 
-        if datetime.month >= now.month:
-            datetime = datetime.replace(year=now.year)
+    return events
+
+def get_atwoods_events():
+    print('Getting events at Atwoods...')
+
+    atwoods_events = BeautifulSoup(
+        requests.get(
+            'https://atwoodstavern.com/music',
+            headers=headers
+        ).text,
+        features='html.parser'
+    ).find_all(class_='summary-item')
+
+    events = []
+    for event in atwoods_events:
+        title_element = event.find(class_='summary-title')
+
+        date = event.find(class_='summary-metadata-item--date').text.strip()
+        details_string = event.find(class_="summary-excerpt").find("p").text
+        time = details_string.split('showtime')[0].split(",")[-1].replace("showtime", "").strip() + 'm'
+        
+        time_format = ''
+        if ':' in time:
+            time_format = 'h:mma'
         else:
-            datetime = datetime.replace(year=now.year + 1)
-
-        new_event = {
-            'location': 'The Porch',
-            'name': event.find(class_='eds-is-hidden-accessible').text.strip(),
-            'datetime': datetime,
-        }
-        if new_event['datetime'] not in [e['datetime'] for e in events]:
-            events.append(new_event)
-
-    return events
-
-def get_city_winery_events():
-    print('Getting events at City Winery...')
-    city_winery_search_results = BeautifulSoup(
-        requests.get(
-            'https://www.citywinery.com/boston/Online/default.asp?BOparam::WScontent::loadArticle::permalink=boston-buy-tickets',
-            headers=headers
-        ).text,
-        features='html.parser'
-    ).find_all('script')[25]
-
-    city_winery_events = json.loads(city_winery_search_results.string.replace('\n', '').replace('\r', '').replace('\t', '').split('searchResults : ')[1].split(',  searchFilters')[0].replace('\\n', ' ').replace('\\/', '/').replace('\\"', '').replace("\\\'", ""))
-
-    events = []
-    for event in city_winery_events:
-        # 'Wednesday, August 11, 2021 8:00 PM',
-        datetime = arrow.get(event[7], 'dddd, MMMM D, YYYY h:mm A', tzinfo='US/Eastern')
-        events.append({
-            'location': 'City Winery',
-            'name': event[6],
-            'datetime': datetime
-        })
-
-    return events
-
-def get_sinclair_events():
-    print('Getting events at The Sinclair...')
-    sinclair_events = BeautifulSoup(
-        requests.get(
-            'https://www.sinclaircambridge.com/events',
-            headers=headers
-        ).text,
-        features='html.parser'
-    ).find_all(class_='info')
-
-    events = []
-    for event in sinclair_events:
-        datestring = event.find(class_='date').text.strip()
-        timestring = event.find(class_='time').text.split('Doors')[1].strip()
-        datetime = arrow.get(datestring + timestring, 'ddd, MMM D, YYYYh:mm A', tzinfo='US/Eastern')
+            time_format = 'ha'
         
-        name = event.find(class_='carousel_item_title_small').text.strip()
-        opener = event.find(class_='supporting').text.strip()
-        if opener:
-            name += ' w/ ' + opener
+        if 'cancel' in time.lower():
+            continue
+
+        try:
+            datetime = arrow.get(date + time, 'MMM D, YYYY' + time_format, tzinfo='US/Eastern')
+        except arrow.parser.ParserMatchError as e:
+            print(e)
+            continue
 
         events.append({
-            'location': 'The Sinclair',
-            'name': name,
+            'location': 'Atwoods',
+            'name': title_element.text.strip(),
             'datetime': datetime
         })
+
     return events
 
+def get_brattle_events(days):
+    print('Getting events at Brattle Theater...')
+    url_base = 'https://brattlefilm.org/'
+    events = []
+    for day_shift in range(days):
+        date = now.shift(days=day_shift).format('YYYY-MM-DD')
+        brattle_events = BeautifulSoup(
+            requests.get(
+                'https://brattlefilm.org/' + date,
+                headers=headers
+            ).text,
+            features='html.parser'
+        ).find_all(class_='showtime')
+
+        for event in brattle_events:
+            events.append({
+                'location': 'Brattle Theater',
+                'name': event.find_parent(class_='showtimes-description').find(class_='show-title').text.strip(),
+                'datetime': arrow.get(date + event.text.split('m')[0].strip() + 'm', 'YYYY-MM-DDh:mm A', tzinfo='US/Eastern')
+            })
+    
+    return events
 
 def get_burren_events():
     print('Getting events at The Burren...')
@@ -141,65 +137,27 @@ def get_burren_events():
 
     return events
 
-def get_brattle_events(days):
-    print('Getting events at Brattle Theater...')
-    url_base = 'https://brattlefilm.org/'
+def get_city_winery_events():
+    print('Getting events at City Winery...')
+    city_winery_search_results = BeautifulSoup(
+        requests.get(
+            'https://www.citywinery.com/boston/Online/default.asp?BOparam::WScontent::loadArticle::permalink=boston-buy-tickets',
+            headers=headers
+        ).text,
+        features='html.parser'
+    ).find_all('script')[25]
+
+    city_winery_events = json.loads(city_winery_search_results.string.replace('\n', '').replace('\r', '').replace('\t', '').split('searchResults : ')[1].split(',  searchFilters')[0].replace('\\n', ' ').replace('\\/', '/').replace('\\"', '').replace("\\\'", ""))
+
     events = []
-    for day_shift in range(days):
-        date = now.shift(days=day_shift).format('YYYY-MM-DD')
-        brattle_events = BeautifulSoup(
-            requests.get(
-                'https://brattlefilm.org/' + date,
-                headers=headers
-            ).text,
-            features='html.parser'
-        ).find_all(class_='showtime')
-
-        for event in brattle_events:
-            events.append({
-                'location': 'Brattle Theater',
-                'name': event.find_parent(class_='showtimes-description').find(class_='show-title').text.strip(),
-                'datetime': arrow.get(date + event.text.split('m')[0].strip() + 'm', 'YYYY-MM-DDh:mm A', tzinfo='US/Eastern')
-            })
-    
-    return events
-
-def get_plough_events():
-    print('Getting events at Plough & Stars...')
-    url_base = 'https://calendar.ploughandstars.com/events/calendar?month={}&year={}'
-    month_tuples = [(now.month, now.year), (now.shift(months=1).month, now.shift(months=1).year)]
-    
-    events = []
-    for month_tuple in month_tuples:
-        plough_days = BeautifulSoup(
-            requests.get(
-                url_base.format(*month_tuple),
-                headers=headers
-            ).text,
-            features='html.parser'
-        ).find_all(class_='day-block')
-
-        for day_block in plough_days:
-            day = day_block.find(class_='number').text
-            day_events = day_block.find(class_='row')
-            if not day_events:
-                continue
-            for event in day_events:
-                time = event.find(class_='flex_item_left').text
-                if not time:
-                    continue
-                time = time.split('pm')[0]
-                if '-' in time:
-                    time = time.split('-')[0]
-                if ':' not in time:
-                    time += ':00'
-                time += 'pm'
-                
-                events.append({
-                    'location': 'Plough & Stars',
-                    'name': event.find(class_='event').text,
-                    'datetime': arrow.get(str(month_tuple[1]) + ' ' + day + ' ' + time, 'YYYY ddd MMM D h:mmA', tzinfo='US/Eastern')
-                })
+    for event in city_winery_events:
+        # 'Wednesday, August 11, 2021 8:00 PM',
+        datetime = arrow.get(event[7], 'dddd, MMMM D, YYYY h:mm A', tzinfo='US/Eastern')
+        events.append({
+            'location': 'City Winery',
+            'name': event[6],
+            'datetime': datetime
+        })
 
     return events
 
@@ -257,26 +215,109 @@ def get_lilypad_events():
 
     return events
 
-def get_aeronaut_events():
-    print('Getting events at Aeronaut...')
-    # Get the JSON of the events directly from the CDN
-    aeronaut_events = json.loads(requests.get(
-        'https://d3izki9aezxlkr.cloudfront.net/public_events.json',
-        headers=headers
-    ).text)
+def get_plough_events():
+    print('Getting events at Plough & Stars...')
+    url_base = 'https://calendar.ploughandstars.com/events/calendar?month={}&year={}'
+    month_tuples = [(now.month, now.year), (now.shift(months=1).month, now.shift(months=1).year)]
+    
+    events = []
+    for month_tuple in month_tuples:
+        plough_days = BeautifulSoup(
+            requests.get(
+                url_base.format(*month_tuple),
+                headers=headers
+            ).text,
+            features='html.parser'
+        ).find_all(class_='day-block')
+
+        for day_block in plough_days:
+            day = day_block.find(class_='number').text
+            day_events = day_block.find(class_='row')
+            if not day_events:
+                continue
+            for event in day_events:
+                time = event.find(class_='flex_item_left').text
+                if not time:
+                    continue
+                time = time.split('pm')[0]
+                if '-' in time:
+                    time = time.split('-')[0]
+                if ':' not in time:
+                    time += ':00'
+                time += 'pm'
+                
+                events.append({
+                    'location': 'Plough & Stars',
+                    'name': event.find(class_='event').text,
+                    'datetime': arrow.get(str(month_tuple[1]) + ' ' + day + ' ' + time, 'YYYY ddd MMM D h:mmA', tzinfo='US/Eastern')
+                })
+
+    return events
+
+def get_porch_events():
+    print('Getting events at The Porch...')
+    porch_events = BeautifulSoup(
+        requests.get(
+            'https://www.eventbrite.com/o/the-porch-southern-fare-amp-juke-joint-34116949537#events',
+            headers=headers
+        ).text,
+        features='html.parser'
+    ).find_all(class_='eds-event-card-content__content-container')
 
     events = []
-    for event in aeronaut_events:
-        if event['category'] != 'music':
+    for event in porch_events:
+        date_string = event.find(class_='eds-event-card-content__sub-title').text.strip()
+        # Unsure what to do if there are multiple dates
+        if date_string == 'MULTIPLE DATES':
             continue
-        events.append({
-            'name': event['name'],
-            'location': 'Aeronaut ' + ('Brewery' if event['venue_slug'] == 'somerville' else 'Cannery'),
-            'datetime': arrow.get(
-                event['date'] + ' ' + event['start'],
-                'YYYY-MM-DD H:mm', tzinfo='US/Eastern')
-        })
+        elif 'Today at' in date_string:
+            date_string = date_string.replace('Today at', now.format('ddd, MMM D,'))
+        elif 'Tomorrow' in date_string:
+            date_string = date_string.replace('Tomorrow at', now.shift(days=1).format('ddd, MMM D,'))
+        
+        datetime = arrow.get(date_string, 'ddd, MMM D, h:mm A', tzinfo='US/Eastern')
 
+        if datetime.month >= now.month:
+            datetime = datetime.replace(year=now.year)
+        else:
+            datetime = datetime.replace(year=now.year + 1)
+
+        new_event = {
+            'location': 'The Porch',
+            'name': event.find(class_='eds-is-hidden-accessible').text.strip(),
+            'datetime': datetime,
+        }
+        if new_event['datetime'] not in [e['datetime'] for e in events]:
+            events.append(new_event)
+
+    return events
+
+def get_sinclair_events():
+    print('Getting events at The Sinclair...')
+    sinclair_events = BeautifulSoup(
+        requests.get(
+            'https://www.sinclaircambridge.com/events',
+            headers=headers
+        ).text,
+        features='html.parser'
+    ).find_all(class_='info')
+
+    events = []
+    for event in sinclair_events:
+        datestring = event.find(class_='date').text.strip()
+        timestring = event.find(class_='time').text.split('Doors')[1].strip()
+        datetime = arrow.get(datestring + timestring, 'ddd, MMM D, YYYYh:mm A', tzinfo='US/Eastern')
+        
+        name = event.find(class_='carousel_item_title_small').text.strip()
+        opener = event.find(class_='supporting').text.strip()
+        if opener:
+            name += ' w/ ' + opener
+
+        events.append({
+            'location': 'The Sinclair',
+            'name': name,
+            'datetime': datetime
+        })
     return events
 
 def get_toad_events():
@@ -330,48 +371,6 @@ def get_toad_events():
 
     return events
 
-def get_atwoods_events():
-    print('Getting events at Atwoods...')
-
-    atwoods_events = BeautifulSoup(
-        requests.get(
-            'https://atwoodstavern.com/music',
-            headers=headers
-        ).text,
-        features='html.parser'
-    ).find_all(class_='summary-item')
-
-    events = []
-    for event in atwoods_events:
-        title_element = event.find(class_='summary-title')
-
-        date = event.find(class_='summary-metadata-item--date').text.strip()
-        details_string = event.find(class_="summary-excerpt").find("p").text
-        time = details_string.split('showtime')[0].split(",")[-1].replace("showtime", "").strip() + 'm'
-        
-        time_format = ''
-        if ':' in time:
-            time_format = 'h:mma'
-        else:
-            time_format = 'ha'
-        
-        if 'cancel' in time.lower():
-            continue
-
-        try:
-            datetime = arrow.get(date + time, 'MMM D, YYYY' + time_format, tzinfo='US/Eastern')
-        except arrow.parser.ParserMatchError as e:
-            print(e)
-            continue
-
-        events.append({
-            'location': 'Atwoods',
-            'name': title_element.text.strip(),
-            'datetime': datetime
-        })
-
-    return events
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--days', type=int, default=1,
@@ -380,17 +379,17 @@ args = parser.parse_args()
 
 print()
 events = (
-    get_toad_events() +
-    get_porch_events() + 
-    get_city_winery_events() + 
-    get_sinclair_events() + 
-    get_burren_events() + 
+    get_aeronaut_events() +
+    get_atwoods_events() +
     get_brattle_events(args.days) +
-    get_plough_events() +
+    get_burren_events() + 
+    get_city_winery_events() + 
     get_crystal_ballroom_events() +
     get_lilypad_events() +
-    get_aeronaut_events() +
-    get_atwoods_events()
+    get_plough_events() +
+    get_porch_events() + 
+    get_sinclair_events() + 
+    get_toad_events()
 )
 print()
 
